@@ -1,0 +1,1 @@
+- **A pointer move stops at the topmost target.** `on_pointer_move` and `on_pointer_move_local` no longer fire on an element drawn under another element that takes input, unless that element is inside it, as presses already do.

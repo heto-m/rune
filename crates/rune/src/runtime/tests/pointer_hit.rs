@@ -411,3 +411,27 @@ fn hover_change_spans_descendants_and_holds_through_a_press() {
     rt.frame(0.0);
     assert_eq!(rt.state.0, [true, false, true, false]);
 }
+
+#[test]
+fn a_pointer_move_stops_at_the_topmost_target() {
+    fn view(_: &Vec<&'static str>, _: &mut Cx<Vec<&'static str>>) -> El {
+        el().size(100.0, 100.0)
+            .child(el().key("canvas").size(100.0, 100.0).on_pointer_move(|s: &mut Vec<&'static str>, _| s.push("canvas")))
+            .child(el().key("card").size(40.0, 40.0).pin(Some(10.0), Some(10.0), None, None)
+                .on_press(|_: &mut Vec<&'static str>| {})
+                .on_pointer_move(|s: &mut Vec<&'static str>, _| s.push("card"))
+                .child(el().size(10.0, 10.0).on_pointer_move(|s: &mut Vec<&'static str>, _| s.push("label"))))
+    }
+    let mut rt = Runtime::new(Vec::new(), view, (100.0, 100.0), Env { system_dark: true, scale: 1.0 });
+    rt.frame(0.0);
+    let mut moved = |x, y| {
+        rt.pointer_move(x, y);
+        rt.frame(0.0);
+        let mut events = std::mem::take(&mut rt.state);
+        events.sort();
+        events
+    };
+    assert_eq!(moved(80.0, 80.0), ["canvas"]);
+    assert_eq!(moved(30.0, 30.0), ["card"], "the canvas under the card doesn't see it");
+    assert_eq!(moved(15.0, 15.0), ["card", "label"], "a child of the card is still inside it");
+}

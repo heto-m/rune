@@ -15,10 +15,12 @@ impl<S: 'static> Runtime<S> {
         if moved { self.hover_paused = false; self.release_hover_hold(); }
         self.pointer = Some((x, y));
         if self.in_viewport(x, y) { self.left_in_capture = false; }
-        for &(id, rect) in &self.hits {
+        let cover = self.move_cover(x, y);
+        for (k, &(id, rect)) in self.hits.iter().enumerate() {
             if self.hit_contains(id, rect, x, y)
                 && let Some(&i) = self.node_index.get(&id)
                 && self.nodes[i].handlers.get().is_some_and(|h| h.on_pointer_move.is_some())
+                && cover.is_none_or(|(at, top)| at <= k || self.is_within(top, i))
             {
                 let point = self.pointer_event(i, x, y);
                 self.queue.push(Action::PointerMove(self.nodes[i].path.clone(), point));
@@ -53,6 +55,17 @@ impl<S: 'static> Runtime<S> {
             let d = Drag { phase: Phase::Move, x: lx, y: ly, dx, dy, window: [x, y], screen: self.screen_at(x, y), ..d };
             self.queue.push(Action::Drag(path, d, self.capture_button));
         }
+    }
+
+    fn move_cover(&self, x: f32, y: f32) -> Option<(usize, usize)> {
+        let top = self.top_target(x, y)?;
+        let id = self.nodes[top].id;
+        let at = self.hits.iter().rposition(|&(hit, r)| hit == id && self.hit_contains(hit, r, x, y))?;
+        Some((at, top))
+    }
+
+    fn is_within(&self, i: usize, ancestor: usize) -> bool {
+        i == ancestor || std::iter::successors(self.nodes[i].parent, |&p| self.nodes[p].parent).any(|p| p == ancestor)
     }
 
     /// Overlay observation updates coordinates without presenting unchanged hover pixels.
